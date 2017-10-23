@@ -1,20 +1,67 @@
 public static int main (string[] args) {
-    string path = "/usr/share/gir-1.0/Gtk-3.0.gir";
-    string method = "gtk_label_new";
+    bool gir_file = false;
+    bool c_file = false;
+    bool _show_help = false;
     
-    if (args[1] != null && args[2] != null) {
-        path = args[1];
-        method = args[2];
+    GLib.List<string> gir_files = new GLib.List<string> ();
+    GLib.List<string> c_files = new GLib.List<string> ();
+    
+    if (args.length == 1) {
+        _show_help = true;
     }
     
-	var parser = new GirParser ();
-	parser.parse_file_from_path (path);
-	var matcher = new CMatcher (parser.get_parsed_info ().copy ());
-	if (matcher.is_known_constructor (method)) {
-	    stdout.printf ("known\n");
-	} else {
-	    stdout.printf ("not known\n");
-	}
-	
-	return 0;
+    foreach (string arg in args[1:args.length]) {
+        if (arg.get(0) == '-') {
+            gir_file = false;
+            c_file = false;
+            switch (arg) {
+                case "--gir-files":
+                    gir_file = true;
+                    break;
+                case "--c-files":
+                    c_file = true;
+                    break;
+                case "--help":
+                case "-h":
+                    _show_help = true;
+                    break;
+                default:
+                    warning ("unknown argument: %s", arg);
+                    break;
+            }
+        } else {
+            if (gir_file) {
+                gir_files.prepend (arg);
+            } else if (c_file) {
+                c_files.prepend (arg);
+            } else {
+                warning ("unknown argument: %s", arg);
+            }
+        }
+    }
+    
+    if (_show_help) {
+        show_help ();
+        return 0;
+    }
+    var matcher = new CMatcher (parse_gir (gir_files));
+    if (matcher.is_known_constructor ("gtk_label_new")) {
+        stdout.printf ("known constructor\n");
+    } else {
+        stdout.printf ("not a known constructor\n");
+    }
+
+    return 0;
+}
+
+private void show_help () {
+    warning ("stub");
+}
+
+private GLib.List<ConstructorInfo> parse_gir (GLib.List<string> gir_files) {
+    var parser = new GirParser ();
+    foreach (string path in gir_files) {
+        parser.parse_file_from_path (path);
+    }
+    return parser.get_parsed_info ();
 }

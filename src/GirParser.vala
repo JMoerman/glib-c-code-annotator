@@ -9,7 +9,6 @@ class GirParser {
         foreach (Xml.Node* node in new NodeIterator (root->children, "namespace")) {
             var info = new ConstructorInfo (node->get_prop("symbol-prefixes"), {"_new"});
             foreach (Xml.Node* classnode in new NodeIterator (node->children, "class")) {
-//                stdout.printf ("class prefix: %s\n", classnode->get_prop("symbol-prefix"));
                 foreach (Xml.Node* constructnode in new NodeIterator (classnode->children, "constructor")) {
                     string c_identifier = constructnode->get_prop("identifier");
                     if (c_identifier != null) {
@@ -49,8 +48,12 @@ class GirParser {
 	    delete doc;
     }
     
-    public unowned GLib.List<ConstructorInfo> get_parsed_info () {
-        return parsed_info;
+    public GLib.List<ConstructorInfo> get_parsed_info () {
+        var parsed_info_copy = new GLib.List<ConstructorInfo> ();
+        foreach (var info in parsed_info) {
+            parsed_info_copy.prepend (info);
+        }
+        return parsed_info_copy;
     }
 }
 
