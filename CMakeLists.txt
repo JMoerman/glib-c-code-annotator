@@ -15,6 +15,7 @@ find_package(PkgConfig)
 pkg_check_modules(DEPS REQUIRED
     gee-0.8
     libxml-2.0
+    gio-2.0
 )
 
 add_definitions(${DEPS_CFLAGS})
@@ -44,6 +45,7 @@ vala_precompile(VALA_C ${EXEC_NAME}
 PACKAGES
     gee-0.8
     libxml-2.0
+    gio-2.0
 )
 
 # tell cmake what to call the executable we just made
