@@ -46,9 +46,10 @@ public static int main (string[] args) {
     }
     var matcher = new CMatcher (parse_gir (gir_files));
 
-    foreach (string file in c_files) {
-        stdout.printf ("%s\n", file);
-        rewrite_file (File.new_for_path (file), null, matcher);
+    foreach (string filename in c_files) {
+        stdout.printf ("%s\n", filename);
+        var file = File.new_for_path (filename);
+        rewrite_file (file, file, matcher);
     }
 
     return 0;
@@ -58,12 +59,16 @@ private void show_help () {
     warning ("stub");
 }
 
-private GLib.List<ConstructorInfo> parse_gir (GLib.List<string> gir_files) {
+private GLib.List<ConstructorMap> parse_gir (GLib.List<string> gir_files) {
     var parser = new GirParser ();
     foreach (string path in gir_files) {
         parser.parse_file_from_path (path);
     }
-    return parser.get_parsed_info ();
+    GLib.List<ConstructorMap> maps = parser.get_parsed_info ();
+    var gobject_map = new ConstructorMap ("g", {"_new"});
+    gobject_map.add_c_constructor ("g_object_new", "GObject");
+    maps.prepend (gobject_map);
+    return maps;
 }
 
 const string[] blacklist = {
@@ -161,7 +166,7 @@ class BracketTree {
                     cont = false;
                     break;
                 case '"':
-                    line = "\"" + line + stream.read_upto ("\"", 1, null);
+                    line = line + "\"" + stream.read_upto ("\"", 1, null);
                     if (stream.get_available () > 0) {
                         delim = stream.read_byte ();
                         line = line + "\"";
@@ -181,25 +186,37 @@ class BracketTree {
     }
 
 
-    public void print_filestream (GLib.FileStream stream) {
+    public void print_filestream (GLib.FileStream stream, bool root = false) {
         stream.printf ("%s", content);
         if (children != null) {
-            stream.printf ("(");
+            if (!root) {
+                stream.printf ("(");
+            }
             foreach (var child in children.head) {
-                if (child == this) {
-                    foreach (var _child in children.head) {
-                        warning ("%s", _child.content);
-                    }
-                    error ("child == this %s", content);
-                }
                 child.print_filestream (stream);
             }
-            stream.printf (")");
+            if (!root) {
+                stream.printf (")");
+            }
         }
-
     }
 
-    public void insert_node (string new_content, string child_content) {
+    public void write_outputstream (DataOutputStream stream, bool root = false) throws IOError {
+        stream.put_string (content);
+        if (children != null) {
+            if (!root) {
+                stream.put_string ("(");
+            }
+            foreach (var child in children.head) {
+                child.write_outputstream (stream);
+            }
+            if (!root) {
+                stream.put_string (")");
+            }
+        }
+    }
+
+    public void insert (string new_content, string child_content) {
         var _children = new GLib.Queue<BracketTree> ();
         var child_node = new BracketTree ((owned) this._children, child_content);
         _children.push_tail (child_node);
@@ -219,22 +236,33 @@ private void rewrite_tree (BracketTree tree, CMatcher matcher) {
         length = content.length;
         var function = extract_funtion (content, length, out start, out end);
         if (function != null) {
-            if (matcher.is_known_constructor (function)) {
-                content = content.splice (start, end, "test_func");
-                tree.insert_node (content, function);
+            string c_type;
+            if (matcher.is_known_constructor (function, out c_type)) {
+                tree.insert (" ", function);
+                tree.insert (content.slice(0, start), "(%s*) g_object_init".printf (c_type));
             }
         }
     }
 }
 
-private void rewrite_file (File in_file, File? out_file, CMatcher matcher) {
+private void rewrite_file (File in_file, File out_file, CMatcher matcher) {
+    BracketTree tree;
     try {
         var stream_in = new DataInputStream (in_file.read ());
-        var tree = new BracketTree.from_stream ("", stream_in);
+        tree = new BracketTree.from_stream ("", stream_in);
         rewrite_tree (tree, matcher);
-        tree.print_filestream (stdout);
-        stdout.flush ();
     } catch (Error e) {
         warning (e.message);
+        return;
+    }
+    try {
+        var file_io_stream =
+            out_file.replace_readwrite (null, true, FileCreateFlags.NONE);
+        var stream_out =
+            new DataOutputStream (file_io_stream.output_stream);
+
+        tree.write_outputstream (stream_out, true);
+    } catch (Error e) {
+        error ("Error writing file: %s", e.message);
     }
 }

@@ -1,18 +1,19 @@
 class GirParser {
-    private GLib.List<ConstructorInfo> parsed_info;
+    private GLib.List<ConstructorMap> parsed_info;
     
     public GirParser () {
-        parsed_info = new GLib.List<ConstructorInfo> ();
+        parsed_info = new GLib.List<ConstructorMap> ();
     }
     
     private void parse_doc (Xml.Node* root) {
         foreach (Xml.Node* node in new NodeIterator (root->children, "namespace")) {
-            var info = new ConstructorInfo (node->get_prop("symbol-prefixes"), {"_new"});
+            var info = new ConstructorMap (node->get_prop("symbol-prefixes"), {"_new"});
             foreach (Xml.Node* classnode in new NodeIterator (node->children, "class")) {
+                string c_type = classnode->get_prop("type");
                 foreach (Xml.Node* constructnode in new NodeIterator (classnode->children, "constructor")) {
                     string c_identifier = constructnode->get_prop("identifier");
                     if (c_identifier != null) {
-                        info.add_c_constructor (constructnode->get_prop("identifier"));
+                        info.add_c_constructor (c_identifier, c_type);
                     } else {
                         warning ("constructor node is missing c identifier %s %s", classnode->get_prop("name"), constructnode->get_prop("name"));
                     }
@@ -48,8 +49,8 @@ class GirParser {
 	    delete doc;
     }
     
-    public GLib.List<ConstructorInfo> get_parsed_info () {
-        var parsed_info_copy = new GLib.List<ConstructorInfo> ();
+    public GLib.List<ConstructorMap> get_parsed_info () {
+        var parsed_info_copy = new GLib.List<ConstructorMap> ();
         foreach (var info in parsed_info) {
             parsed_info_copy.prepend (info);
         }

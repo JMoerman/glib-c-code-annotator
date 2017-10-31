@@ -24,6 +24,7 @@ link_directories(${DEPS_LIBRARY_DIRS})
 
 # disable c compiler warnings
 add_definitions(-w)
+add_definitions(-g)
 add_definitions(-DGETTEXT_PACKAGE=\"${GETTEXT_PACKAGE}\")
 
 # make sure we have vala
@@ -37,7 +38,7 @@ ensure_vala_version("0.26" MINIMUM)
 include(ValaPrecompile)
 vala_precompile(VALA_C ${EXEC_NAME}
     src/CMatcher.vala
-    src/ConstructorInfo.vala
+    src/ConstructorMap.vala
     src/GirParser.vala
     src/Main.vala
 
